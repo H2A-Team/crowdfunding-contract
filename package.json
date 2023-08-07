@@ -1,0 +1,20 @@
+{
+  "name": "crowdfunding-contract",
+  "author": {
+    "name": "Huy Le Minh",
+    "url": "https://github.com/huyleminh"
+  },
+  "version": "1.0.0",
+  "scripts": {
+    "build": "npx thirdweb@latest detect",
+    "deploy": "npx thirdweb@latest deploy",
+    "release": "npx thirdweb@latest release"
+  },
+  "devDependencies": {
+    "hardhat": "^2.13.0"
+  },
+  "dependencies": {
+    "@thirdweb-dev/contracts": "^3.8.0",
+    "dotenv": "^16.3.1"
+  }
+}
