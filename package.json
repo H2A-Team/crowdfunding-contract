@@ -8,7 +8,8 @@
   "scripts": {
     "build": "npx thirdweb@latest detect",
     "deploy": "npx thirdweb@latest deploy",
-    "release": "npx thirdweb@latest release"
+    "release": "npx thirdweb@latest release",
+    "local-chain": "npx hardhat node --network hardhat"
   },
   "devDependencies": {
     "hardhat": "^2.13.0"

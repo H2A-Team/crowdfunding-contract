@@ -1,4 +1,5 @@
-const { APP_CONFIGS } = require("./configs");
+const dotenv = require("dotenv");
+dotenv.config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -8,11 +9,18 @@ module.exports = {
         cache: "./cache",
         artifacts: "./artifacts",
     },
-    defaultNetwork: APP_CONFIGS.defaultNetwork,
+    defaultNetwork: process.env.NETWORK || "sepolia",
     networks: {
+        hardhat: {
+            chainId: 1337,
+        },
         sepolia: {
-            url: APP_CONFIGS.sepolia.url,
-            accounts: [`0x${APP_CONFIGS.sepolia.key}`],
+            url: process.env.SEPOLIA_URL,
+            accounts: [`0x${process.env.SEPOLIA_KEY}`],
+        },
+        localhost: {
+            url: process.env.LOCAL_CHAIN,
+            chainId: 1337,
         },
     },
     solidity: {
