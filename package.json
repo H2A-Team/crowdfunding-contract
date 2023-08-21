@@ -7,9 +7,10 @@
   "version": "1.0.0",
   "scripts": {
     "build": "npx thirdweb@latest detect",
-    "deploy": "npx thirdweb@latest deploy",
+    "deploy": "npm run clean-build && npx thirdweb@latest deploy",
     "release": "npx thirdweb@latest release",
-    "local-chain": "npx hardhat node --network hardhat"
+    "local-chain": "npx hardhat node --network hardhat",
+    "clean-build": "rm -rf ./cache && rm -rf ./artifacts"
   },
   "devDependencies": {
     "hardhat": "^2.13.0"
