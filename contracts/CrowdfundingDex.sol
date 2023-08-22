@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 contract CrowdfundingDex {
     using Strings for string;
 
-    enum ProjectState { APPLICATION_CREATED, APPLICATION_OPEN, APPLICATION_CLOSED, PUBLISHED }
-
     struct Investor {
         uint256 stakeTime;
         uint256 stakeAmount;
@@ -39,17 +37,16 @@ contract CrowdfundingDex {
         string slug;
         string shortDescription;
         string description;
-        ProjectState state;
         string logoUrl;
         string coverBackgroundUrl;
         TokenInformation tokenInformation;
         ProjectSchedule schedule;
         ProjectAllocation allocation;
     }
-    mapping(uint256 => Project) internal projectList;
 
     struct CreateProjectDTO {
         string name;
+        string slug;
         string shortDescription;
         string description;
         string logoUrl;
@@ -71,6 +68,9 @@ contract CrowdfundingDex {
     uint256 globalProjectIdCount = 0;
     uint256 globalProjectCount = 0;
 
+    Project[] internal projectList;
+    string[] internal slugPool;
+
     modifier validSender {
         if (msg.sender == address(0)) {
             revert("Invalid sender address");
@@ -91,31 +91,53 @@ contract CrowdfundingDex {
         require(dto.idoStartsAt >= dto.endsAt, "IDO start date should be larger than the end date");
         require(dto.idoEndsAt >= dto.idoStartsAt, "IDO end date should be larger than IDO start date");
 
-        Project storage project = projectList[globalProjectCount];
+        // create slug
+
         globalProjectIdCount++;
+        string memory projectSlug = createSlug(dto.slug);
+        slugPool.push(projectSlug);
 
-        project.id = globalProjectIdCount;
-        project.name = dto.name;
-        project.shortDescription = dto.shortDescription;
-        project.description = dto.description;
-        project.logoUrl = dto.logoUrl;
-        project.coverBackgroundUrl = dto.coverBackgroundUrl;
-
-        project.allocation.maxAllocation = dto.maxAllocation;
-        project.allocation.totalRaise = dto.totalRaise;
-
-        project.state = ProjectState.APPLICATION_CREATED;
-
-        project.tokenInformation.symbol = dto.tokenSymbol;
-        project.tokenInformation.swapRaito = dto.tokenSwapRaito;
-
-        project.schedule.createdAt = block.timestamp;
-        project.schedule.opensAt = dto.opensAt;
-        project.schedule.endsAt = dto.endsAt;
-        project.schedule.idoStartsAt = dto.idoStartsAt;
-        project.schedule.idoEndsAt = dto.idoEndsAt;
+        Project memory project = Project(
+            globalProjectIdCount,
+            msg.sender,
+            dto.name,
+            projectSlug,
+            dto.shortDescription,
+            dto.description,
+            dto.logoUrl,
+            dto.coverBackgroundUrl,
+            TokenInformation(dto.tokenSymbol, dto.tokenSwapRaito),
+            ProjectSchedule(block.timestamp, dto.opensAt, dto.endsAt, dto.idoStartsAt, dto.idoEndsAt),
+            ProjectAllocation(dto.maxAllocation, dto.totalRaise)
+        );
+        projectList.push(project);
 
         globalProjectCount++;
         return project.id;
+    }
+
+    function getProjectList() public view returns (Project[] memory) {
+        return projectList;
+    }
+
+    function createSlug(string calldata str) private view returns (string memory) {
+        string memory slug = str;
+        while (isSlugBoolInclude(slug)) {
+            uint randNum = uint(keccak256(abi.encodePacked(block.timestamp, msg.sender)));
+            slug = string.concat(str, "-", Strings.toString(randNum));
+        }
+
+        return slug;
+    }
+
+    function isSlugBoolInclude(string memory str) view private returns (bool) {
+        for (uint i = 0; i < slugPool.length; i++) {
+            string memory current = slugPool[i];
+
+            if (current.equal(str)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
