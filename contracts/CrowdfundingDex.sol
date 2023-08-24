@@ -6,9 +6,9 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 contract CrowdfundingDex {
     using Strings for string;
 
-    struct Investor {
+    struct VestingInfor {
+        uint256 stakeAmountInWei;
         uint256 stakeTime;
-        uint256 stakeAmount;
     }
 
     struct TokenInformation {
@@ -42,6 +42,7 @@ contract CrowdfundingDex {
         TokenInformation tokenInformation;
         ProjectSchedule schedule;
         ProjectAllocation allocation;
+        uint256 currentRaise;
     }
 
     struct CreateProjectDTO {
@@ -63,10 +64,12 @@ contract CrowdfundingDex {
     }
 
     // Mapping: projectId -> list of project's investors
-    mapping(uint256 => Investor[]) internal projectInvestorMap;
+    mapping(uint256 => VestingInfor[]) internal projectInvestorMap;
+
+    // mapping(address => mapping(uint256 => VestingInfor[])) internal investorToProjectMap;
+    mapping(uint256 => mapping(address => VestingInfor[])) internal projectToInvestorMap;
 
     uint256 globalProjectIdCount = 0;
-    uint256 globalProjectCount = 0;
 
     Project[] internal projectList;
     string[] internal slugPool;
@@ -86,14 +89,13 @@ contract CrowdfundingDex {
         require(dto.totalRaise > 0, "Total raise must larger than 0");
         require(!dto.tokenSymbol.equal(""), "Missing token symbol");
 
-        require(dto.opensAt > block.timestamp, "Open date should be a date in future");
+        require(dto.opensAt > block.timestamp * 1000, "Open date should be a date in future");
         require(dto.endsAt > dto.opensAt, "Allocation end date should be larger than open date");
         require(dto.idoStartsAt >= dto.endsAt, "IDO start date should be larger than the end date");
         require(dto.idoEndsAt >= dto.idoStartsAt, "IDO end date should be larger than IDO start date");
 
-        // create slug
-
         globalProjectIdCount++;
+        // create slug
         string memory projectSlug = createSlug(dto.slug);
         slugPool.push(projectSlug);
 
@@ -107,17 +109,54 @@ contract CrowdfundingDex {
             dto.logoUrl,
             dto.coverBackgroundUrl,
             TokenInformation(dto.tokenSymbol, dto.tokenSwapRaito),
-            ProjectSchedule(block.timestamp, dto.opensAt, dto.endsAt, dto.idoStartsAt, dto.idoEndsAt),
-            ProjectAllocation(dto.maxAllocation, dto.totalRaise)
+            ProjectSchedule(block.timestamp * 1000, dto.opensAt, dto.endsAt, dto.idoStartsAt, dto.idoEndsAt),
+            ProjectAllocation(dto.maxAllocation, dto.totalRaise),
+            0
         );
         projectList.push(project);
 
-        globalProjectCount++;
         return project.id;
     }
 
     function getProjectList() public view returns (Project[] memory) {
         return projectList;
+    }
+
+    function stakingInProject(uint256 projectId) validSender public payable {
+        // validate project id
+        int index = findIndexOfProject(projectId);
+
+        if (index == -1) {
+            revert("Invalid project id");
+        }
+
+        Project storage project =  projectList[uint(index)];
+        uint userStakeInWei = msg.value;
+
+        // check stake time is early or late
+        require(block.timestamp * 1000 >= project.schedule.opensAt && block.timestamp * 1000 <= project.schedule.endsAt, "Project staking is not opened");
+
+        // check min allocation
+        require(userStakeInWei > 0, "Not enough money");
+
+        // check valid allocation
+        VestingInfor[] storage vestingList = projectToInvestorMap[project.id][msg.sender];
+
+        uint256 totalStakeInWei = 0;
+        for (uint i = 0; i < vestingList.length; i++) {
+            totalStakeInWei += vestingList[i].stakeAmountInWei;
+        }
+
+        require(totalStakeInWei + userStakeInWei <= project.allocation.maxAllocation * (10**18), "Too much money");
+
+        // add amount to storage
+        project.currentRaise += userStakeInWei;
+        // add investor
+        vestingList.push(VestingInfor(userStakeInWei, block.timestamp * 1000));
+    }
+
+    function getBalance() public view returns (uint256) {
+        return address(this).balance;
     }
 
     function createSlug(string calldata str) private view returns (string memory) {
@@ -139,5 +178,15 @@ contract CrowdfundingDex {
             }
         }
         return false;
+    }
+
+    function findIndexOfProject(uint256 projectId) private view returns (int) {
+        for (uint i = 0; i < projectList.length; i++) {
+            if (projectList[i].id == projectId) {
+                return int(i);
+            }
+        }
+
+        return -1;
     }
 }
