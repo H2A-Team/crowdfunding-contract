@@ -43,6 +43,7 @@ contract CrowdfundingDex {
         ProjectSchedule schedule;
         ProjectAllocation allocation;
         uint256 currentRaise;
+        uint256 totalParticipants;
     }
 
     struct CreateProjectDTO {
@@ -63,13 +64,20 @@ contract CrowdfundingDex {
         uint256 idoEndsAt;
     }
 
-    // Mapping: projectId -> list of project's investors
-    mapping(uint256 => VestingInfor[]) internal projectInvestorMap;
+    struct DexMetrics {
+        uint256 totalProjects;
+        uint256 uniqueParticipants;
+        uint256 totalRaised;
+    }
 
-    // mapping(address => mapping(uint256 => VestingInfor[])) internal investorToProjectMap;
     mapping(uint256 => mapping(address => VestingInfor[])) internal projectToInvestorMap;
+    //check unque user in project
+    mapping(uint256 => mapping(address => bool)) internal uniqueProjectInvestorMap;
+    // check unique user
+    mapping(address => bool) internal uniqueParticipantMap;
 
     uint256 globalProjectIdCount = 0;
+    uint256 globalUniqeParticipantCount = 0;
 
     Project[] internal projectList;
     string[] internal slugPool;
@@ -111,6 +119,7 @@ contract CrowdfundingDex {
             TokenInformation(dto.tokenSymbol, dto.tokenSwapRaito),
             ProjectSchedule(block.timestamp * 1000, dto.opensAt, dto.endsAt, dto.idoStartsAt, dto.idoEndsAt),
             ProjectAllocation(dto.maxAllocation, dto.totalRaise),
+            0,
             0
         );
         projectList.push(project);
@@ -151,12 +160,34 @@ contract CrowdfundingDex {
 
         // add amount to storage
         project.currentRaise += userStakeInWei;
-        // add investor
+
+        // add investor to project
+        if (!uniqueProjectInvestorMap[project.id][msg.sender]) {
+            project.totalParticipants++;
+            uniqueProjectInvestorMap[project.id][msg.sender] = true;
+        }
+
         vestingList.push(VestingInfor(userStakeInWei, block.timestamp * 1000));
+
+        // count global participant
+        if (!uniqueParticipantMap[msg.sender]) {
+            uniqueParticipantMap[msg.sender] = true;
+            globalUniqeParticipantCount++;
+        }
     }
 
     function getBalance() public view returns (uint256) {
         return address(this).balance;
+    }
+
+    function getDexMetris() public view returns (DexMetrics memory) {
+        uint256 totalRaised = 0;
+
+        for (uint i = 0; i < projectList.length; i++) {
+            totalRaised += projectList[i].currentRaise;
+        }
+
+        return DexMetrics(projectList.length, globalUniqeParticipantCount, totalRaised);
     }
 
     function createSlug(string calldata str) private view returns (string memory) {
