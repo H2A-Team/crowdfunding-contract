@@ -14,7 +14,6 @@ contract CrowdfundingDex {
     struct TokenInformation {
         string symbol;
         string swapRaito;
-        // address tokenAddress;
     }
 
     struct ProjectSchedule {
@@ -75,12 +74,13 @@ contract CrowdfundingDex {
     mapping(uint256 => mapping(address => bool)) internal uniqueProjectInvestorMap;
     // check unique user
     mapping(address => bool) internal uniqueParticipantMap;
+    // check unique slug
+    mapping(string => bool) internal uniqueSlugMap;
 
     uint256 globalProjectIdCount = 0;
     uint256 globalUniqeParticipantCount = 0;
 
     Project[] internal projectList;
-    string[] internal slugPool;
 
     modifier validSender {
         if (msg.sender == address(0)) {
@@ -105,7 +105,8 @@ contract CrowdfundingDex {
         globalProjectIdCount++;
         // create slug
         string memory projectSlug = createSlug(dto.slug);
-        slugPool.push(projectSlug);
+        // slugPool.push(projectSlug);
+        uniqueSlugMap[projectSlug] = true;
 
         Project memory project = Project(
             globalProjectIdCount,
@@ -190,25 +191,23 @@ contract CrowdfundingDex {
         return DexMetrics(projectList.length, globalUniqeParticipantCount, totalRaised);
     }
 
+    function getProjectDetail(string calldata slug) public view returns (Project memory) {
+        int index = findIndexOfProject(slug);
+
+        require(index > -1, "Project not found");
+
+        Project memory project = projectList[uint(index)];
+        return project;
+    }
+
     function createSlug(string calldata str) private view returns (string memory) {
         string memory slug = str;
-        while (isSlugBoolInclude(slug)) {
+        while (uniqueSlugMap[slug]) {
             uint randNum = uint(keccak256(abi.encodePacked(block.timestamp, msg.sender)));
             slug = string.concat(str, "-", Strings.toString(randNum));
         }
 
         return slug;
-    }
-
-    function isSlugBoolInclude(string memory str) view private returns (bool) {
-        for (uint i = 0; i < slugPool.length; i++) {
-            string memory current = slugPool[i];
-
-            if (current.equal(str)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     function findIndexOfProject(uint256 projectId) private view returns (int) {
@@ -218,6 +217,15 @@ contract CrowdfundingDex {
             }
         }
 
+        return -1;
+    }
+
+    function findIndexOfProject(string calldata slug) private view returns (int) {
+        for (uint i = 0; i < projectList.length; i++) {
+            if (projectList[i].slug.equal(slug)) {
+                return int(i);
+            }
+        }
         return -1;
     }
 }
