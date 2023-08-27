@@ -20,8 +20,6 @@ contract CrowdfundingDex {
         uint256 createdAt;
         uint256 opensAt;
         uint256 endsAt;
-        uint256 idoStartsAt;
-        uint256 idoEndsAt;
     }
 
     struct ProjectAllocation {
@@ -55,12 +53,9 @@ contract CrowdfundingDex {
         uint256 maxAllocation;
         uint256 totalRaise;
         string tokenSymbol;
-        // string tokenAddress;
         string tokenSwapRaito;
         uint256 opensAt;
         uint256 endsAt;
-        uint256 idoStartsAt;
-        uint256 idoEndsAt;
     }
 
     struct DexMetrics {
@@ -99,8 +94,6 @@ contract CrowdfundingDex {
 
         require(dto.opensAt > block.timestamp * 1000, "Open date should be a date in future");
         require(dto.endsAt > dto.opensAt, "Allocation end date should be larger than open date");
-        require(dto.idoStartsAt >= dto.endsAt, "IDO start date should be larger than the end date");
-        require(dto.idoEndsAt >= dto.idoStartsAt, "IDO end date should be larger than IDO start date");
 
         globalProjectIdCount++;
         // create slug
@@ -118,7 +111,7 @@ contract CrowdfundingDex {
             dto.logoUrl,
             dto.coverBackgroundUrl,
             TokenInformation(dto.tokenSymbol, dto.tokenSwapRaito),
-            ProjectSchedule(block.timestamp * 1000, dto.opensAt, dto.endsAt, dto.idoStartsAt, dto.idoEndsAt),
+            ProjectSchedule(block.timestamp * 1000, dto.opensAt, dto.endsAt),
             ProjectAllocation(dto.maxAllocation, dto.totalRaise),
             0,
             0
@@ -133,9 +126,7 @@ contract CrowdfundingDex {
     }
 
     function stakingInProject(uint256 projectId) public payable validSender {
-        // validate project id
         int256 index = findIndexOfProject(projectId);
-
         require(index > -1, "project_not_found");
 
         Project storage project = projectList[uint256(index)];
@@ -224,24 +215,6 @@ contract CrowdfundingDex {
         Project[] memory list = new Project[](count);
         for (uint256 i = 0; i < projectList.length; i++) {
             if (uniqueProjectInvestorMap[projectList[i].id][investor]) {
-                list[i] = projectList[i];
-            }
-        }
-
-        return list;
-    }
-
-    function getMyProjects() public view returns (Project[] memory) {
-        uint256 count = 0;
-        for (uint256 i = 0; i < projectList.length; i++) {
-            if (projectList[i].owner == msg.sender) {
-                count++;
-            }
-        }
-
-        Project[] memory list = new Project[](count);
-        for (uint256 i = 0; i < projectList.length; i++) {
-            if (projectList[i].owner == msg.sender) {
                 list[i] = projectList[i];
             }
         }
