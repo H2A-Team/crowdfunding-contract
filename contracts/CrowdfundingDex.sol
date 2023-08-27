@@ -132,32 +132,37 @@ contract CrowdfundingDex {
         return projectList;
     }
 
-    function stakingInProject(uint256 projectId) validSender public payable {
+    function stakingInProject(uint256 projectId) public payable validSender {
         // validate project id
-        int index = findIndexOfProject(projectId);
+        int256 index = findIndexOfProject(projectId);
 
-        if (index == -1) {
-            revert("Invalid project id");
-        }
+        require(index > -1, "project_not_found");
 
-        Project storage project =  projectList[uint(index)];
-        uint userStakeInWei = msg.value;
+        Project storage project = projectList[uint256(index)];
+        uint256 userStakeInWei = msg.value;
+
+        // check owner self staking
+        require(msg.sender != project.owner, "project_owner");
 
         // check stake time is early or late
-        require(block.timestamp * 1000 >= project.schedule.opensAt && block.timestamp * 1000 <= project.schedule.endsAt, "Project staking is not opened");
+        require(block.timestamp * 1000 >= project.schedule.opensAt && block.timestamp * 1000 <= project.schedule.endsAt, "staking_not_open");
+
+        // check is full of staking or not
+        require(project.allocation.totalRaise * 10**18 > project.currentRaise, "target_reached");
 
         // check min allocation
-        require(userStakeInWei > 0, "Not enough money");
+        require(userStakeInWei > 0, "not_enough");
 
         // check valid allocation
         VestingInfor[] storage vestingList = projectToInvestorMap[project.id][msg.sender];
 
         uint256 totalStakeInWei = 0;
-        for (uint i = 0; i < vestingList.length; i++) {
+        for (uint256 i = 0; i < vestingList.length; i++) {
             totalStakeInWei += vestingList[i].stakeAmountInWei;
         }
 
-        require(totalStakeInWei + userStakeInWei <= project.allocation.maxAllocation * (10**18), "Too much money");
+        require(totalStakeInWei + userStakeInWei <= project.allocation.maxAllocation * (10**18), "max_allocation");
+        require(project.currentRaise + userStakeInWei <= project.allocation.totalRaise * (10**18), "too_much");
 
         // add amount to storage
         project.currentRaise += userStakeInWei;
@@ -184,7 +189,7 @@ contract CrowdfundingDex {
     function getDexMetris() public view returns (DexMetrics memory) {
         uint256 totalRaised = 0;
 
-        for (uint i = 0; i < projectList.length; i++) {
+        for (uint256 i = 0; i < projectList.length; i++) {
             totalRaised += projectList[i].currentRaise;
         }
 
@@ -192,38 +197,81 @@ contract CrowdfundingDex {
     }
 
     function getProjectDetail(string calldata slug) public view returns (Project memory) {
-        int index = findIndexOfProject(slug);
+        int256 index = findIndexOfProject(slug);
 
-        require(index > -1, "Project not found");
+        require(index > -1, "not_found");
 
-        Project memory project = projectList[uint(index)];
+        Project memory project = projectList[uint256(index)];
         return project;
+    }
+
+    function getProjectStakingByInvestor(uint256 projectId) public view returns (VestingInfor[] memory) {
+        require(uniqueProjectInvestorMap[projectId][msg.sender], "staking_not_found");
+
+        return projectToInvestorMap[projectId][msg.sender];
+    }
+
+    function getStakedProjectByInvestor() public view returns (Project[] memory) {
+        address investor = msg.sender;
+
+        uint256 count = 0;
+        for (uint256 i = 0; i < projectList.length; i++) {
+            if (uniqueProjectInvestorMap[projectList[i].id][investor]) {
+                count++;
+            }
+        }
+
+        Project[] memory list = new Project[](count);
+        for (uint256 i = 0; i < projectList.length; i++) {
+            if (uniqueProjectInvestorMap[projectList[i].id][investor]) {
+                list[i] = projectList[i];
+            }
+        }
+
+        return list;
+    }
+
+    function getMyProjects() public view returns (Project[] memory) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < projectList.length; i++) {
+            if (projectList[i].owner == msg.sender) {
+                count++;
+            }
+        }
+
+        Project[] memory list = new Project[](count);
+        for (uint256 i = 0; i < projectList.length; i++) {
+            if (projectList[i].owner == msg.sender) {
+                list[i] = projectList[i];
+            }
+        }
+
+        return list;
     }
 
     function createSlug(string calldata str) private view returns (string memory) {
         string memory slug = str;
         while (uniqueSlugMap[slug]) {
-            uint randNum = uint(keccak256(abi.encodePacked(block.timestamp, msg.sender)));
+            uint256 randNum = uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender)));
             slug = string.concat(str, "-", Strings.toString(randNum));
         }
 
         return slug;
     }
 
-    function findIndexOfProject(uint256 projectId) private view returns (int) {
-        for (uint i = 0; i < projectList.length; i++) {
+    function findIndexOfProject(uint256 projectId) private view returns (int256) {
+        for (uint256 i = 0; i < projectList.length; i++) {
             if (projectList[i].id == projectId) {
-                return int(i);
+                return int256(i);
             }
         }
-
         return -1;
     }
 
-    function findIndexOfProject(string calldata slug) private view returns (int) {
-        for (uint i = 0; i < projectList.length; i++) {
+    function findIndexOfProject(string calldata slug) private view returns (int256) {
+        for (uint256 i = 0; i < projectList.length; i++) {
             if (projectList[i].slug.equal(slug)) {
-                return int(i);
+                return int256(i);
             }
         }
         return -1;
