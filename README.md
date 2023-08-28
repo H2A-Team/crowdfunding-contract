@@ -1,3 +1,15 @@
+# Crowdfunding Contract
+
+## Owner information
+- Group name: H2A
+- University: University of Science - VNUHCM
+
+| Student Name    | Student ID | Email                       |
+| --------------- | ---------- | --------------------------- |
+| Huy Le Minh     | 19127157   | leminhhuy.hcmus@gmail.com   |
+| Anh Hoang Le    | 19127329   | lehoanganh.le2001@gmail.com |
+| Hung Nguyen Hua | 19127150   | huahung.nguyen01@gmail.com  |
+
 ## Getting Started
 
 Create a project using this example:
@@ -42,6 +54,14 @@ npm run release
 yarn release
 ```
 
-## Join our Discord!
-
-For any questions, suggestions, join our discord at [https://discord.gg/thirdweb](https://discord.gg/thirdweb).
+## Build and deploy on local
+- Run a local chain by using this command:
+    ```bash
+    npm run local-chain
+    ```
+- Create `.env` following `.env.template`:
+- Then deploy by using this command:
+    ```bash
+    npm run deploy
+    ```
+- If it requires an API KEY, go to [thirdweb](https://thirdweb.com/dashboard), login with your MetaMask wallet and then create an API KEY for your own.
