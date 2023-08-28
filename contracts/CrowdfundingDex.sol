@@ -42,6 +42,7 @@ contract CrowdfundingDex is Ownable {
         ProjectAllocation allocation;
         uint256 currentRaise;
         uint256 totalParticipants;
+        address[] investors;
     }
 
     struct CreateProjectDTO {
@@ -68,6 +69,9 @@ contract CrowdfundingDex is Ownable {
     mapping(uint256 => mapping(address => VestingInfor[])) internal projectToInvestorMap;
     //check unque user in project
     mapping(uint256 => mapping(address => bool)) internal uniqueProjectInvestorMap;
+    // check investor is refunded
+    mapping(uint256 => mapping(address => bool)) internal projectToInvestorRefundMap;
+
     // check unique user
     mapping(address => bool) internal uniqueParticipantMap;
     // check unique slug
@@ -115,7 +119,8 @@ contract CrowdfundingDex is Ownable {
             ProjectSchedule(block.timestamp * 1000, dto.opensAt, dto.endsAt),
             ProjectAllocation(dto.maxAllocation, dto.totalRaise),
             0,
-            0
+            0,
+            new address[](0)
         );
         projectList.push(project);
 
@@ -163,6 +168,7 @@ contract CrowdfundingDex is Ownable {
         if (!uniqueProjectInvestorMap[project.id][msg.sender]) {
             project.totalParticipants++;
             uniqueProjectInvestorMap[project.id][msg.sender] = true;
+            project.investors.push(msg.sender);
         }
 
         vestingList.push(VestingInfor(userStakeInWei, block.timestamp * 1000));
@@ -238,14 +244,37 @@ contract CrowdfundingDex is Ownable {
         if (isFulllyFunded) {
             require(address(this).balance >= project.currentRaise, "Contract balance is not enough");
 
-            (bool sent,) = payable(project.owner).call{value: this.getBalance()}("");
+            (bool sent,) = payable(project.owner).call{value: project.currentRaise}("");
             if (!sent) {
                 return "Sending money to owner failed";
             }
 
             return "Successfully sent money to owner";
         }
-        return "Target was not reached";
+
+        address[] memory investors = project.investors;
+        uint count = 0;
+        for (uint256 i = 0; i < project.totalParticipants; i++) {
+            VestingInfor[] memory infor = projectToInvestorMap[project.id][investors[i]];
+
+            // this investor is refunded
+            if (projectToInvestorRefundMap[project.id][investors[i]]) {
+                continue;
+            }
+
+            uint256 total = 0;
+            for (uint256 j = 0; j < infor.length; j++) {
+                total += infor[j].stakeAmountInWei;
+            }
+
+            (bool sent,) = payable(investors[i]).call{value: total}("");
+            if (sent) {
+                projectToInvestorRefundMap[project.id][investors[i]] = true;
+                count++;
+            }
+        }
+
+        return string.concat("Successfully sent money to ", Strings.toString(count), " investors");
     }
 
     function createSlug(string calldata str) private view returns (string memory) {
