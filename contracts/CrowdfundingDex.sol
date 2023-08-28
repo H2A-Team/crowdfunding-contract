@@ -2,8 +2,9 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract CrowdfundingDex {
+contract CrowdfundingDex is Ownable {
     using Strings for string;
 
     struct VestingInfor {
@@ -139,7 +140,7 @@ contract CrowdfundingDex {
         require(block.timestamp * 1000 >= project.schedule.opensAt && block.timestamp * 1000 <= project.schedule.endsAt, "staking_not_open");
 
         // check is full of staking or not
-        require(project.allocation.totalRaise * 10**18 > project.currentRaise, "target_reached");
+        require(project.allocation.totalRaise > project.currentRaise, "target_reached");
 
         // check min allocation
         require(userStakeInWei > 0, "not_enough");
@@ -152,8 +153,8 @@ contract CrowdfundingDex {
             totalStakeInWei += vestingList[i].stakeAmountInWei;
         }
 
-        require(totalStakeInWei + userStakeInWei <= project.allocation.maxAllocation * (10**18), "max_allocation");
-        require(project.currentRaise + userStakeInWei <= project.allocation.totalRaise * (10**18), "too_much");
+        require(totalStakeInWei + userStakeInWei <= project.allocation.maxAllocation, "max_allocation");
+        require(project.currentRaise + userStakeInWei <= project.allocation.totalRaise, "too_much");
 
         // add amount to storage
         project.currentRaise += userStakeInWei;
@@ -220,6 +221,31 @@ contract CrowdfundingDex {
         }
 
         return list;
+    }
+
+    function automateDeliverMoney(string calldata slug) public onlyOwner returns (string memory) {
+        int256 index = findIndexOfProject(slug);
+        require(index > -1, "not_found");
+
+        Project memory project = projectList[uint256(index)];
+
+        // Project funding still in progess
+        require(block.timestamp * 1000 >= project.schedule.endsAt, "Funding period still in progress");
+
+        // Check funding condition
+        bool isFulllyFunded = project.currentRaise >= project.allocation.totalRaise * 90 / 100;
+
+        if (isFulllyFunded) {
+            require(address(this).balance >= project.currentRaise, "Contract balance is not enough");
+
+            (bool sent,) = payable(project.owner).call{value: this.getBalance()}("");
+            if (!sent) {
+                return "Sending money to owner failed";
+            }
+
+            return "Successfully sent money to owner";
+        }
+        return "Target was not reached";
     }
 
     function createSlug(string calldata str) private view returns (string memory) {
