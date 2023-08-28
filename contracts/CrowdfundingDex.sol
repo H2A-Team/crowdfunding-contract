@@ -89,7 +89,7 @@ contract CrowdfundingDex is Ownable {
         _;
     }
 
-    function createProject(CreateProjectDTO calldata dto) validSender public returns (uint256) {
+    function createProject(CreateProjectDTO calldata dto) validSender public returns (Project memory) {
         require(!dto.name.equal(""), "Project name is required");
         require(!dto.shortDescription.equal(""), "Project headline is required");
         require(!dto.description.equal(""), "Project description is required");
@@ -124,7 +124,7 @@ contract CrowdfundingDex is Ownable {
         );
         projectList.push(project);
 
-        return project.id;
+        return project;
     }
 
     function getProjectList() public view returns (Project[] memory) {
